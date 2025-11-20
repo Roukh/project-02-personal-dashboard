@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Star } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { TrendingUp, TrendingDown, Star, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface StockData {
   symbol: string;
@@ -22,9 +23,9 @@ export function StocksWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchStocks = async () => {
+  const fetchStocks = useCallback(async () => {
       try {
         const apiKey = process.env.NEXT_PUBLIC_STOCKS_API;
         if (!apiKey) {
@@ -93,6 +94,7 @@ export function StocksWidget() {
           // Cache the results
           localStorage.setItem('stocksCache', JSON.stringify(stockData));
           localStorage.setItem('stocksCacheTime', Date.now().toString());
+          setLastUpdated(new Date());
         }
 
         setLoading(false);
@@ -101,10 +103,38 @@ export function StocksWidget() {
         setError('Failed to load stock data. Please try again later.');
         setLoading(false);
       }
-    };
+    }, []);
 
+  useEffect(() => {
     fetchStocks();
-  }, []);
+
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => {
+      fetchStocks();
+    }, 5 * 60 * 1000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [fetchStocks]);
+
+  const handleManualRefresh = () => {
+    // Clear cache on manual refresh to get fresh data
+    localStorage.removeItem('stocksCache');
+    localStorage.removeItem('stocksCacheTime');
+    fetchStocks();
+  };
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 minute ago';
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    return date.toLocaleTimeString();
+  };
 
   const toggleFavorite = (symbol: string) => {
     setFavorites((prev) =>
@@ -115,7 +145,25 @@ export function StocksWidget() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Stock Market</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Stock Market</CardTitle>
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleManualRefresh}
+              disabled={loading}
+              title="Refresh stock data"
+            >
+              <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && <p className="text-center text-muted-foreground">Loading stocks...</p>}

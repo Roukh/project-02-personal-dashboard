@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ExternalLink, Bookmark } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Bookmark, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface NewsArticle {
   id: string;
@@ -21,9 +22,9 @@ export function NewsWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
       try {
         const apiKey = process.env.NEXT_PUBLIC_NEWS_API;
         if (!apiKey) {
@@ -54,16 +55,42 @@ export function NewsWidget() {
         }));
 
         setNews(articles);
+        setLastUpdated(new Date());
         setLoading(false);
       } catch (error) {
         console.error('Error fetching news:', error);
         setError('Failed to load news. Please try again later.');
         setLoading(false);
       }
-    };
+    }, []);
 
+  useEffect(() => {
     fetchNews();
-  }, []);
+
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => {
+      fetchNews();
+    }, 5 * 60 * 1000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [fetchNews]);
+
+  const handleManualRefresh = () => {
+    fetchNews();
+  };
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 minute ago';
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    return date.toLocaleTimeString();
+  };
 
   const toggleBookmark = (id: string) => {
     setBookmarks((prev) =>
@@ -84,7 +111,25 @@ export function NewsWidget() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Top Headlines</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Top Headlines</CardTitle>
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleManualRefresh}
+              disabled={loading}
+              title="Refresh news"
+            >
+              <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && <p className="text-center text-muted-foreground">Loading news...</p>}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ExternalLink, Calendar, FolderOpen, List } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Calendar, FolderOpen, List, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface ClickUpTask {
   id: string;
@@ -30,9 +31,9 @@ export function TaskList() {
   const [tasks, setTasks] = useState<ClickUpTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
       try {
         const response = await fetch('/api/clickup/tasks');
 
@@ -42,16 +43,42 @@ export function TaskList() {
 
         const data = await response.json();
         setTasks(data.tasks || []);
+        setLastUpdated(new Date());
         setLoading(false);
       } catch (error) {
         console.error('Error fetching tasks:', error);
         setError('Failed to load tasks from ClickUp');
         setLoading(false);
       }
-    };
+    }, []);
 
+  useEffect(() => {
     fetchTasks();
-  }, []);
+
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => {
+      fetchTasks();
+    }, 5 * 60 * 1000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [fetchTasks]);
+
+  const handleManualRefresh = () => {
+    fetchTasks();
+  };
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 minute ago';
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    return date.toLocaleTimeString();
+  };
 
   const formatDueDate = (dueDate: string | null) => {
     if (!dueDate) return null;
@@ -85,7 +112,25 @@ export function TaskList() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>ClickUp Tasks</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>ClickUp Tasks</CardTitle>
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleManualRefresh}
+              disabled={loading}
+              title="Refresh tasks"
+            >
+              <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {loading && (

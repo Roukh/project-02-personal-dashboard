@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Search, MapPin, Wind, Droplets, Thermometer } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, MapPin, Wind, Droplets, Thermometer, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,8 +30,9 @@ export function WeatherCard() {
   const [error, setError] = useState<string | null>(null);
   const [city, setCity] = useState('Bethesda');
   const [inputCity, setInputCity] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchWeather = async (cityName: string) => {
+  const fetchWeather = useCallback(async (cityName: string) => {
     setLoading(true);
     setError(null);
 
@@ -61,6 +62,7 @@ export function WeatherCard() {
       const data: WeatherData = await response.json();
       setWeather(data);
       setError(null);
+      setLastUpdated(new Date());
       setLoading(false);
     } catch (error) {
       console.error('Error fetching weather:', error);
@@ -68,11 +70,35 @@ export function WeatherCard() {
       setWeather(null);
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchWeather(city);
-  }, [city]);
+
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => {
+      fetchWeather(city);
+    }, 5 * 60 * 1000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [city, fetchWeather]);
+
+  const handleManualRefresh = () => {
+    fetchWeather(city);
+  };
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 minute ago';
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    return date.toLocaleTimeString();
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +111,25 @@ export function WeatherCard() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Current Weather</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Current Weather</CardTitle>
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleManualRefresh}
+              disabled={loading}
+              title="Refresh weather data"
+            >
+              <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
         <form onSubmit={handleSearch} className="flex gap-2 mt-4">
           <Input
             type="text"

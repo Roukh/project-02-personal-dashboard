@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Cloud, CloudRain, Sun, Wind, CloudSnow, CloudDrizzle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Cloud, CloudRain, Sun, Wind, CloudSnow, CloudDrizzle, RefreshCw } from 'lucide-react';
 
 interface ForecastDay {
   day: string;
@@ -15,9 +16,9 @@ export function ForecastCard() {
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchForecast = async () => {
+  const fetchForecast = useCallback(async () => {
       try {
         const apiKey = process.env.NEXT_PUBLIC_OPEN_WEATHER_MAP_API;
         if (!apiKey) {
@@ -61,16 +62,42 @@ export function ForecastCard() {
         });
 
         setForecast(dailyForecasts);
+        setLastUpdated(new Date());
         setLoading(false);
       } catch (error) {
         console.error('Error fetching forecast:', error);
         setError('Failed to load forecast data');
         setLoading(false);
       }
-    };
+    }, []);
 
+  useEffect(() => {
     fetchForecast();
-  }, []);
+
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => {
+      fetchForecast();
+    }, 5 * 60 * 1000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [fetchForecast]);
+
+  const handleManualRefresh = () => {
+    fetchForecast();
+  };
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 minute ago';
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    return date.toLocaleTimeString();
+  };
 
   const getWeatherIcon = (icon: string) => {
     const iconClass = 'size-8 text-muted-foreground';
@@ -94,7 +121,25 @@ export function ForecastCard() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>5-Day Forecast</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>5-Day Forecast</CardTitle>
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleManualRefresh}
+              disabled={loading}
+              title="Refresh forecast data"
+            >
+              <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && (
