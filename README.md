@@ -147,6 +147,98 @@ This issue is being investigated and will be fixed in a future update.
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint
 
+## Deployment to Vercel
+
+### Quick Deploy
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/project-02-personal-dashboard)
+
+### Manual Deployment
+
+1. **Install Vercel CLI** (optional):
+   ```bash
+   npm i -g vercel
+   ```
+
+2. **Deploy to Vercel**:
+   ```bash
+   vercel
+   ```
+   Follow the prompts to link your project.
+
+### Adding Environment Variables to Vercel
+
+After deploying, you need to add your API keys as environment variables:
+
+#### Method 1: Via Vercel Dashboard (Recommended)
+
+1. Go to [vercel.com](https://vercel.com) and sign in
+2. Select your project from the dashboard
+3. Click on **Settings** → **Environment Variables**
+4. Add each variable:
+
+   | Variable Name | Example Value | Environment |
+   |--------------|---------------|-------------|
+   | `NEXT_PUBLIC_OPEN_WEATHER_MAP_API` | `your_api_key_here` | Production, Preview, Development |
+   | `NEXT_PUBLIC_STOCKS_API` | `your_api_key_here` | Production, Preview, Development |
+   | `NEXT_PUBLIC_NEWS_API` | `your_api_key_here` | Production, Preview, Development |
+   | `CLICKUP_API_TOKEN` | `your_api_key_here` | Production, Preview, Development |
+
+5. For each variable:
+   - Enter the **Name** (e.g., `NEXT_PUBLIC_OPEN_WEATHER_MAP_API`)
+   - Enter the **Value** (your actual API key)
+   - Select environments: ✅ Production, ✅ Preview, ✅ Development
+   - Click **Save**
+
+6. **Redeploy your application**:
+   - Go to **Deployments** tab
+   - Click the ⋯ menu on your latest deployment
+   - Select **Redeploy** to apply the new variables
+
+#### Method 2: Via Vercel CLI
+
+```bash
+# Login to Vercel
+vercel login
+
+# Add environment variables
+vercel env add NEXT_PUBLIC_OPEN_WEATHER_MAP_API
+# Enter value when prompted, select environments
+
+# Repeat for all variables
+vercel env add NEXT_PUBLIC_STOCKS_API
+vercel env add NEXT_PUBLIC_NEWS_API
+vercel env add CLICKUP_API_TOKEN
+```
+
+#### Method 3: Bulk Import
+
+1. In Vercel Dashboard → Settings → Environment Variables
+2. Click **Add New** dropdown → Select **Paste .env**
+3. Copy the contents from your `.env.local` file
+4. Paste and click **Add**
+5. Select which environments to apply to
+
+### Important Security Notes
+
+⚠️ **Public vs Private Variables**:
+- Variables with `NEXT_PUBLIC_` prefix are exposed to the browser
+- Variables without this prefix are server-side only (like `CLICKUP_API_TOKEN`)
+- Never add sensitive tokens with the `NEXT_PUBLIC_` prefix
+
+📝 **After Adding Variables**:
+- Environment variables are only available after redeployment
+- Push a new commit or manually redeploy to apply changes
+- Variables are encrypted and stored securely by Vercel
+
+### Automatic Deployments
+
+Vercel automatically deploys:
+- **Production**: Every push to your `main` branch
+- **Preview**: Every push to other branches or pull requests
+
+You can configure deployment settings in the Vercel dashboard under **Settings** → **Git**.
+
 ## Customization
 
 ### Adding Widgets
@@ -171,10 +263,13 @@ const [city, setCity] = useState('YourCity');
 
 ## Performance Notes
 
+- **Auto-Refresh**: All data widgets automatically refresh every 5 minutes with manual refresh buttons
 - **Stock Widget**: Implements caching (5-minute cache) to respect API rate limits
-- **Weather Data**: Fetched on component mount and when city changes
-- **News**: Loads top 5 headlines on page load
+- **Weather Data**: Auto-refreshes every 5 minutes, or when city changes
+- **News**: Auto-refreshes every 5 minutes
+- **Tasks**: Auto-refreshes every 5 minutes to stay in sync with ClickUp
 - **Theme**: Persists user preference in localStorage
+- **Interval Cleanup**: All refresh intervals are properly cleaned up on component unmount
 
 ## Contributing
 
